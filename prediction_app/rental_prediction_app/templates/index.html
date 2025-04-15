@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard">
+    <div class="card">
+        <h2 class="card-title"><i class="fas fa-calculator"></i> Prediction Calculator</h2>
+        <form id="prediction-form">
+            <div class="toggle-container">
+                <label class="toggle-label">Use Current Location:</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="use-location">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+
+            <!-- Zipcode field (mandatory) -->
+            <div class="form-group">
+                <label for="zipcode">Zipcode <span class="required">*</span></label>
+                <input type="text" id="zipcode" placeholder="02108" pattern="[0-9]{5}" required>
+                <small>Enter 5-digit zipcode</small>
+            </div>
+
+            <!-- Optional address field -->
+            <div class="form-group" id="location-search">
+                <label for="address">Property Address <span class="optional">(optional)</span></label>
+                <input type="text" id="address" placeholder="Enter property address">
+                <div id="search-results"></div>
+            </div>
+            
+            <div class="form-group">
+                <label for="latitude">Latitude <span class="optional">(optional)</span></label>
+                <input type="number" id="latitude" step="0.000001" placeholder="42.3601">
+            </div>
+            
+            <div class="form-group">
+                <label for="longitude">Longitude <span class="optional">(optional)</span></label>
+                <input type="number" id="longitude" step="0.000001" placeholder="-71.0589">
+            </div>
+            
+            <div class="form-group">
+                <label for="property-type">Property Type <span class="optional">(optional)</span></label>
+                <select id="property-type">
+                    <option value="SINGLE_FAMILY">Single Family</option>
+                    <option value="CONDO">Condo</option>
+                    <option value="MULTI_FAMILY">Multi-Family</option>
+                    <option value="TOWNHOUSE">Townhouse</option>
+                    <option value="MANUFACTURED">Manufactured</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="bedrooms">Bedrooms <span class="required">*</span></label>
+                <input type="number" id="bedrooms" min="0" max="10" step="1" placeholder="3" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="bathrooms">Bathrooms <span class="required">*</span></label>
+                <input type="number" id="bathrooms" min="0.5" max="10" step="0.5" placeholder="2" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="living-area">Living Area (sq ft) <span class="optional">(optional)</span></label>
+                <input type="number" id="living-area" min="100" max="10000" step="1" placeholder="1500">
+            </div>
+            
+            <div class="form-group">
+                <label for="lot-area">Lot Size (acres) <span class="optional">(optional)</span></label>
+                <input type="number" id="lot-area" min="0" max="10" step="0.01" placeholder="0.25">
+            </div>
+            
+            <button type="submit" class="btn-full">
+                <i class="fas fa-search-dollar"></i> Calculate Rental Price
+            </button>
+        </form>
+        
+        <div class="loading">
+            <div class="spinner"></div>
+            <p>Calculating rental estimate...</p>
+        </div>
+        
+        <div class="results">
+            <h3>Estimated Monthly Rent</h3>
+            <div class="prediction">$<span id="predicted-price">0</span></div>
+            <p>Based on properties with similar characteristics</p>
+        </div>
+    </div>
+    
+    <div class="card">
+        <h2 class="card-title"><i class="fas fa-map-marked-alt"></i> Rental Map Explorer</h2>
+        <p>Explore rental prices across Massachusetts. Click on markers to see details.</p>
+        <div class="map-container">
+            <div id="map"></div>
+        </div>
+    </div>
+</div>
+
+<div class="data-card">
+    <h2 class="card-title"><i class="fas fa-chart-line"></i> Market Insights</h2>
+    <div class="data-grid">
+        <div class="stat-card">
+            <div class="stat-label">Average Rent</div>
+            <div class="stat-value" id="avg-rent">$2,850</div>
+            <div class="stat-label">For Massachusetts</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Price Per Sq Ft</div>
+            <div class="stat-value" id="price-per-sqft">$2.15</div>
+            <div class="stat-label">Monthly Average</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Rent YoY Change</div>
+            <div class="stat-value" id="rent-yoy">+4.7%</div>
+            <div class="stat-label">Year over Year</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Vacancy Rate</div>
+            <div class="stat-value" id="vacancy-rate">3.2%</div>
+            <div class="stat-label">Current Market</div>
+        </div>
+    </div>
+    
+    <div class="chart-container">
+        <canvas id="rental-chart"></canvas>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="https://maps.googleapis.com/maps/api/js?key={{ api_key }}&libraries=places&callback=initMap" async defer></script>
+{% endblock %}
