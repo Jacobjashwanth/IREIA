@@ -1,0 +1,95 @@
+/* src/styles/SearchBar.css */
+.search-box {
+    background: white;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.1);
+    border-radius: 30px;
+    padding: 30px;
+    width: 80%;
+    max-width: 900px;
+    margin: 0 20px;
+    transform: translateY(130%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;}
+  
+  .search-inputs {
+    display: flex;
+    justify-content: space-between;
+    gap: 15px;
+    width: 100%;
+    margin-bottom: 20px;
+  }
+  
+  .search-inputs input {
+    flex: 1;
+    padding: 14px 20px;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    font-size: 16px;
+    outline: none;
+  }
+  
+  .search-actions {
+    display: flex;
+    gap: 12px;
+  }
+  
+  .search-btn {
+    background-color: #78be20;
+    color: white;
+    padding: 12px 25px;
+    border: none;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 15px;
+    cursor: pointer;
+  }
+  
+  .advanced-btn {
+    background: white;
+    color: #444;
+    padding: 12px 20px;
+    border: 1px solid #78be20;
+    border-radius: 12px;
+    font-size: 15px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+ /* Custom select styling */
+.search-inputs select {
+  flex: 1;
+  padding: 14px 20px;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  font-size: 16px;
+  color: #444;
+  background-color: white;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%2378be20' stroke-width='2'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  background-size: 12px;
+}
+
+/* Webkit only: style dropdown options */
+.search-inputs select option {
+  background: white;
+  color: #444;
+  padding: 10px;
+}
+
+/* Style for selected option (for modern browsers) */
+.search-inputs select option:checked {
+  background-color: #e6f4d9 !important; /* light green tint */
+  color: #78be20;
+  font-weight: 600;
+}
+
+/* Option hover for Firefox (somewhat limited support) */
+.search-inputs select option:hover {
+  background-color: #f0fdf3;
+}
