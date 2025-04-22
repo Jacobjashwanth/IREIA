@@ -1,5 +1,5 @@
-
 from flask import Flask, render_template, request, jsonify
+from flask_cors import CORS
 import os
 import joblib
 import numpy as np
@@ -8,6 +8,13 @@ from datetime import datetime
 import json
 import requests
 from werkzeug.middleware.proxy_fix import ProxyFix
+import random
+import logging
+import xgboost as xgb
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Import from our modules
 from config import Config
@@ -15,20 +22,48 @@ from models.model import predict_rent
 from data.zillow_api import fetch_rental_listings
 
 app = Flask(__name__)
-app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
-app.config.from_object(Config)
+app.wsgi_app = ProxyFix(app.wsgi_app)
 
-# Load the trained model
-model_path = os.path.join(app.root_path, 'models', 'rental_model.pkl')
+# Configure CORS to allow requests from the React app
+CORS(app, resources={
+    r"/api/*": {
+        "origins": ["http://localhost:3000"],
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type"]
+    }
+})
+
+# ============== MODEL LOADING ==============
+
+# Load the trained rental model
+RENTAL_MODEL_PATH = os.path.join(os.path.dirname(__file__), 'models', 'rental_model.pkl')
 try:
-    model = joblib.load(model_path)
-    print(f"Model loaded successfully from {model_path}")
-except FileNotFoundError:
-    print(f"Warning: Model file not found at {model_path}")
-    model = None
+    rental_model = joblib.load(RENTAL_MODEL_PATH)
+    print(f"✅ Rental model loaded successfully from {RENTAL_MODEL_PATH}")
 except Exception as e:
-    print(f"Error loading model: {e}")
-    model = None
+    print(f"❌ Error loading rental model: {e}")
+    rental_model = None
+
+# Load the XGBoost sales price model
+SALES_MODEL_PATH = os.path.join(os.path.dirname(__file__), 'ml_models', 'price-prediction-model', 'xgboost_final_model.json')
+try:
+    sales_model = xgb.Booster()
+    sales_model.load_model(SALES_MODEL_PATH)
+    print(f"✅ Sales price model loaded successfully from {SALES_MODEL_PATH}")
+except Exception as e:
+    print(f"❌ Error loading sales price model: {e}")
+    sales_model = None
+
+# ============== REALTOR API CONFIG ==============
+REALTOR_API_KEY = "6b504def46msha6bf4ff53605f98p1c0c1djsn3fcd43362b33"
+REALTOR_HOST = "realty-in-us.p.rapidapi.com"
+REALTOR_HEADERS = {
+    "X-RapidAPI-Key": REALTOR_API_KEY,
+    "X-RapidAPI-Host": REALTOR_HOST,
+    "Content-Type": "application/json"
+}
+
+# ============== WEB ROUTES ==============
 
 @app.route('/')
 def index():
@@ -36,117 +71,124 @@ def index():
     return render_template('index.html', 
                            api_key=app.config['GOOGLE_MAPS_API_KEY'])
 
-# @app.route('/api/predict', methods=['POST'])
-# def predict():
-#     """API endpoint for making rental predictions"""
-#     try:
-#         # Get data from request
-#         data = request.get_json()
-        
-#         # Required fields
-#         required_fields = ['latitude', 'longitude', 'propertyType', 
-#                           'bedrooms', 'bathrooms', 'livingArea']
-        
-#         # Check if all required fields are present
-#         for field in required_fields:
-#             if field not in data:
-#                 return jsonify({'error': f'Missing required field: {field}'}), 400
-        
-#         # Use our model prediction function
-#         if model is not None:
-#             predicted_rent = predict_rent(
-#                 model,
-#                 latitude=float(data['latitude']),
-#                 longitude=float(data['longitude']),
-#                 property_type=data['propertyType'],
-#                 bedrooms=int(data['bedrooms']),
-#                 bathrooms=float(data['bathrooms']),
-#                 living_area=int(data['livingArea']),
-#                 lot_area=float(data.get('lotArea', 0.25)),
-#                 days_on_market=int(data.get('daysOnMarket', 0))
-#             )
-            
-#             # Format the result
-#             result = {
-#                 'predictedRent': round(predicted_rent, 2),
-#                 'status': 'success',
-#                 'timestamp': datetime.now().isoformat()
-#             }
-            
-#             return jsonify(result)
-#         else:
-#             # If model is not available, use a fallback method
-#             return jsonify({
-#                 'predictedRent': fallback_prediction(data),
-#                 'status': 'fallback',
-#                 'message': 'Using fallback prediction as model is unavailable',
-#                 'timestamp': datetime.now().isoformat()
-#             })
-            
-#     except Exception as e:
-#         print(f"Error during prediction: {e}")
-#         return jsonify({'error': str(e)}), 500
-
-
+# ============== API ROUTES ==============
 
 @app.route('/api/predict', methods=['POST'])
 def predict():
-    """API endpoint for making rental predictions"""
+    """API endpoint for making predictions"""
     try:
         # Get data from request
         data = request.get_json()
+        print("Received data:", data)
         
         # Required fields
-        required_fields = ['zipcode', 'bedrooms', 'bathrooms']
+        required_fields = ['zipcode', 'bedrooms', 'propertyType']
         
         # Check if all required fields are present
         for field in required_fields:
             if field not in data:
                 return jsonify({'error': f'Missing required field: {field}'}), 400
         
-        # Use our model prediction function
-        if model is not None:
-            predicted_rent = predict_rent(
-                model,
-                bedrooms=int(data['bedrooms']),
-                bathrooms=float(data['bathrooms']),
-                zipcode=data['zipcode'],
-                latitude=float(data.get('latitude', 42.3601)),
-                longitude=float(data.get('longitude', -71.0589)),
-                property_type=data.get('propertyType', 'SINGLE_FAMILY'),
-                living_area=int(data.get('livingArea', 1000)),
-                lot_area=float(data.get('lotArea', 0.25)),
-                days_on_market=int(data.get('daysOnMarket', 0))
-            )
-            
-            # Convert NumPy types to Python native types
-            if hasattr(predicted_rent, 'item'):  # Check if it's a NumPy type
-                predicted_rent = predicted_rent.item()  # Convert to Python native type
-            else:
-                predicted_rent = float(predicted_rent)  # Ensure it's a Python float
-            
-            # Format the result
-            result = {
-                'predictedRent': round(predicted_rent, 2),
-                'status': 'success',
-                'timestamp': datetime.now().isoformat()
-            }
-            
-            return jsonify(result)
+        # Prepare input data with defaults for optional fields
+        input_data = {
+            'zipcode': data['zipcode'],
+            'bedrooms': int(data['bedrooms']),
+            'bathrooms': int(data.get('bathrooms', 1)),  # Default to 1 if not provided
+            'propertyType': data['propertyType'],
+            'livingArea': float(data.get('livingArea', 1000)),  # Default value
+            'lotArea': float(data.get('lotArea', 0.25)),  # Default value
+            'daysOnMarket': int(data.get('daysOnMarket', 0)),  # Default value
+            'yearBuilt': int(data.get('yearBuilt', 1980)),  # Default value
+            'hasGarage': int(data.get('hasGarage', 1)),  # Default value
+            'hasPool': int(data.get('hasPool', 0)),  # Default value
+            'hasFireplace': int(data.get('hasFireplace', 0)),  # Default value
+            'hasBasement': int(data.get('hasBasement', 1)),  # Default value
+            'hasCentralAir': int(data.get('hasCentralAir', 1)),  # Default value
+            'hasSecuritySystem': int(data.get('hasSecuritySystem', 0)),  # Default value
+            'hasSprinklerSystem': int(data.get('hasSprinklerSystem', 0)),  # Default value
+            'hasSolarPanels': int(data.get('hasSolarPanels', 0))  # Default value
+        }
+        
+        print("Input data for prediction:", input_data)
+        
+        # Initialize result dictionary
+        result = {
+            'status': 'success',
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        # Sale Price Prediction
+        if MODELS['sale'] is not None:
+            try:
+                # Convert to numpy array for sale prediction
+                sale_features = np.array([
+                    input_data['bedrooms'],
+                    input_data['bathrooms'],
+                    input_data['livingArea'],
+                    input_data['lotArea'],
+                    input_data['daysOnMarket'],
+                    input_data['yearBuilt'],
+                    input_data['hasGarage'],
+                    input_data['hasPool'],
+                    input_data['hasFireplace'],
+                    input_data['hasBasement'],
+                    input_data['hasCentralAir'],
+                    input_data['hasSecuritySystem'],
+                    input_data['hasSprinklerSystem'],
+                    input_data['hasSolarPanels'],
+                    1 if input_data['propertyType'] == 'CONDO' else 0,
+                    1 if input_data['propertyType'] == 'SINGLE_FAMILY' else 0
+                ]).reshape(1, -1)
+                
+                sale_prediction = MODELS['sale'].predict(sale_features)[0]
+                result['predictedSalePrice'] = round(float(sale_prediction), 2)
+            except Exception as e:
+                print(f"Error in sale price prediction: {e}")
+                result['predictedSalePrice'] = fallback_sale_prediction(input_data)
+                result['sale_note'] = 'Using fallback prediction'
         else:
-            # If model is not available, use a fallback method
-            return jsonify({
-                'predictedRent': fallback_prediction(data),
-                'status': 'fallback',
-                'message': 'Using fallback prediction as model is unavailable',
-                'timestamp': datetime.now().isoformat()
-            })
+            result['predictedSalePrice'] = fallback_sale_prediction(input_data)
+            result['sale_note'] = 'Using fallback prediction (model not loaded)'
+        
+        # Rental Price Prediction
+        if MODELS['rental'] is not None:
+            try:
+                # Convert to numpy array for rental prediction
+                rental_features = np.array([
+                    input_data['bedrooms'],
+                    input_data['bathrooms'],
+                    input_data['livingArea'],
+                    input_data['lotArea'],
+                    input_data['daysOnMarket'],
+                    input_data['yearBuilt'],
+                    input_data['hasGarage'],
+                    input_data['hasPool'],
+                    input_data['hasFireplace'],
+                    input_data['hasBasement'],
+                    input_data['hasCentralAir'],
+                    input_data['hasSecuritySystem'],
+                    input_data['hasSprinklerSystem'],
+                    input_data['hasSolarPanels'],
+                    1 if input_data['propertyType'] == 'CONDO' else 0,
+                    1 if input_data['propertyType'] == 'SINGLE_FAMILY' else 0
+                ]).reshape(1, -1)
+                
+                rental_prediction = MODELS['rental'].predict(rental_features)[0]
+                result['predictedRent'] = round(float(rental_prediction), 2)
+            except Exception as e:
+                print(f"Error in rental price prediction: {e}")
+                result['predictedRent'] = calculate_rental_estimate(input_data)
+                result['rental_note'] = 'Using fallback prediction'
+        else:
+            result['predictedRent'] = calculate_rental_estimate(input_data)
+            result['rental_note'] = 'Using fallback prediction (model not loaded)'
+        
+        print("Prediction result:", result)
+        return jsonify(result)
             
     except Exception as e:
         print(f"Error during prediction: {e}")
         return jsonify({'error': str(e)}), 500
-
-
 
 @app.route('/api/rentals', methods=['GET'])
 def get_rentals():
@@ -211,122 +253,146 @@ def get_market_stats():
         'stats': city_stats
     })
 
-# def fallback_prediction(data):
-#     """Fallback prediction method when model is unavailable"""
-#     # Base rent starts at $1500
-#     predicted_rent = 1500
-    
-#     # Adjust for property type
-#     type_factors = {
-#         'CONDO': 1.1,
-#         'SINGLE_FAMILY': 1.3,
-#         'MULTI_FAMILY': 0.95,
-#         'TOWNHOUSE': 1.2,
-#         'MANUFACTURED': 0.85
-#     }
-#     predicted_rent *= type_factors.get(data['propertyType'], 1.0)
-    
-#     # Adjust for bedrooms
-#     predicted_rent *= (1 + 0.15 * int(data['bedrooms']))
-    
-#     # Adjust for bathrooms
-#     predicted_rent *= (1 + 0.1 * float(data['bathrooms']))
-    
-#     # Adjust for square footage
-#     sqft_factor = (int(data['livingArea']) / 1000) ** 0.7  # Non-linear scaling
-#     predicted_rent *= sqft_factor
-    
-#     # Adjust for location
-#     # Simple adjustment based on distance from downtown Boston
-#     boston_lat, boston_lng = 42.3601, -71.0589
-#     distance = np.sqrt((float(data['latitude']) - boston_lat)**2 + 
-#                         (float(data['longitude']) - boston_lng)**2)
-    
-#     if distance < 0.03:
-#         location_factor = 1.5  # Downtown/central Boston premium
-#     elif distance < 0.1:
-#         location_factor = 1.3  # Inner Boston/Cambridge/Somerville
-#     elif distance < 0.2:
-#         location_factor = 1.15  # Greater Boston area
-#     elif distance < 0.4:
-#         location_factor = 1.0  # Suburbs
-#     else:
-#         location_factor = 0.85  # Further out
-    
-#     predicted_rent *= location_factor
-    
-#     # Round to nearest $10
-#     return round(predicted_rent / 10) * 10
-
-
-
-
-def fallback_prediction(data):
-    """Fallback prediction method when model is unavailable"""
-    # Base rent starts at $1500
-    predicted_rent = 1500
-    
-    # Adjust for property type
-    type_factors = {
-        'CONDO': 1.1,
-        'SINGLE_FAMILY': 1.3,
-        'MULTI_FAMILY': 0.95,
-        'TOWNHOUSE': 1.2,
-        'MANUFACTURED': 0.85
-    }
-    predicted_rent *= type_factors.get(data.get('propertyType', 'SINGLE_FAMILY'), 1.0)
-    
-    # Adjust for bedrooms
-    predicted_rent *= (1 + 0.15 * int(data['bedrooms']))
-    
-    # Adjust for bathrooms
-    predicted_rent *= (1 + 0.1 * float(data['bathrooms']))
-    
-    # Adjust for square footage if available
-    if 'livingArea' in data:
-        sqft_factor = (int(data['livingArea']) / 1000) ** 0.7  # Non-linear scaling
-        predicted_rent *= sqft_factor
-    
-    # Adjust for zipcode (simplified approach)
-    # Premium zipcodes in Boston area
-    premium_zipcodes = ['02108', '02109', '02110', '02111', '02113', '02114', '02115', '02116', 
-                        '02118', '02138', '02139', '02140', '02142', '02210']
-    
-    mid_tier_zipcodes = ['02119', '02120', '02121', '02122', '02125', '02126', '02127', '02128', 
-                         '02129', '02130', '02131', '02132', '02134', '02141', '02143', '02144']
-    
-    zipcode = data.get('zipcode', '02108')
-    
-    if zipcode in premium_zipcodes:
-        zipcode_factor = 1.3  # Premium areas
-    elif zipcode in mid_tier_zipcodes:
-        zipcode_factor = 1.1  # Mid-tier areas
-    else:
-        zipcode_factor = 1.0  # Other areas
-    
-    predicted_rent *= zipcode_factor
-    
-    # Adjust for location if available
-    if 'latitude' in data and 'longitude' in data:
-        boston_lat, boston_lng = 42.3601, -71.0589
-        distance = np.sqrt((float(data['latitude']) - boston_lat)**2 + 
-                           (float(data['longitude']) - boston_lng)**2)
+@app.route('/api/nearby-properties', methods=['GET'])
+def get_nearby_properties():
+    """Get nearby properties for a given location"""
+    try:
+        lat = float(request.args.get('lat'))
+        lng = float(request.args.get('lng'))
         
-        if distance < 0.03:
-            location_factor = 1.5  # Downtown/central Boston premium
-        elif distance < 0.1:
-            location_factor = 1.3  # Inner Boston/Cambridge/Somerville
-        elif distance < 0.2:
-            location_factor = 1.15  # Greater Boston area
-        elif distance < 0.4:
-            location_factor = 1.0  # Suburbs
+        # In a real application, you would query a database or API
+        # For now, we'll generate some sample properties
+        properties = []
+        
+        # Generate 5 sample properties around the given location
+        for i in range(5):
+            # Add some random variation to the coordinates
+            prop_lat = lat + (random.random() - 0.5) * 0.01
+            prop_lng = lng + (random.random() - 0.5) * 0.01
+            
+            # Generate random property details
+            bedrooms = random.randint(1, 5)
+            bathrooms = bedrooms + random.random()
+            living_area = random.randint(800, 3000)
+            property_type = random.choice(['CONDO', 'SINGLE_FAMILY', 'MULTI_FAMILY', 'TOWNHOUSE'])
+            
+            # Create input data for prediction
+            input_data = {
+                'bedrooms': bedrooms,
+                'bathrooms': bathrooms,
+                'livingArea': living_area,
+                'lotArea': random.uniform(0.1, 0.5),
+                'daysOnMarket': random.randint(0, 30),
+                'yearBuilt': random.randint(1950, 2020),
+                'hasGarage': random.choice([0, 1]),
+                'hasPool': random.choice([0, 1]),
+                'hasFireplace': random.choice([0, 1]),
+                'hasBasement': random.choice([0, 1]),
+                'hasCentralAir': random.choice([0, 1]),
+                'hasSecuritySystem': random.choice([0, 1]),
+                'hasSprinklerSystem': random.choice([0, 1]),
+                'hasSolarPanels': random.choice([0, 1]),
+                'propertyType': property_type
+            }
+            
+            # Convert to numpy array for prediction
+            features = np.array([
+                input_data['bedrooms'],
+                input_data['bathrooms'],
+                input_data['livingArea'],
+                input_data['lotArea'],
+                input_data['daysOnMarket'],
+                input_data['yearBuilt'],
+                input_data['hasGarage'],
+                input_data['hasPool'],
+                input_data['hasFireplace'],
+                input_data['hasBasement'],
+                input_data['hasCentralAir'],
+                input_data['hasSecuritySystem'],
+                input_data['hasSprinklerSystem'],
+                input_data['hasSolarPanels'],
+                1 if input_data['propertyType'] == 'CONDO' else 0,
+                1 if input_data['propertyType'] == 'SINGLE_FAMILY' else 0
+            ]).reshape(1, -1)
+            
+            # Make prediction
+            predicted_rent = rental_model.predict(features)[0] if rental_model else calculate_rental_estimate(input_data)
+            
+            properties.append({
+                'latitude': prop_lat,
+                'longitude': prop_lng,
+                'address': f'Property {i+1}',
+                'bedrooms': bedrooms,
+                'bathrooms': bathrooms,
+                'living_area': living_area,
+                'property_type': property_type,
+                'predicted_rent': round(float(predicted_rent), 2)
+            })
+        
+        return jsonify({
+            'status': 'success',
+            'properties': properties
+        })
+        
+    except Exception as e:
+        print(f"Error fetching nearby properties: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+def get_predictions(data):
+    """Get predictions from both models"""
+    try:
+        # Prepare features for both models
+        sale_features = prepare_sale_features(data)
+        rental_features = prepare_rental_features(data)
+        
+        # Make predictions
+        sale_price = None
+        rental_price = None
+        notes = []
+        
+        # Sales price prediction
+        if sales_model is not None:
+            try:
+                # Convert features to DMatrix format required by XGBoost
+                dmatrix = xgb.DMatrix(sale_features)
+                sale_price = sales_model.predict(dmatrix)[0]
+            except Exception as e:
+                logger.error(f"Error predicting sale price: {e}")
+                notes.append("Using fallback sale price prediction")
+                sale_price = calculate_fallback_sale_price(data)
         else:
-            location_factor = 0.85  # Further out
+            notes.append("Sales model not loaded, using fallback prediction")
+            sale_price = calculate_fallback_sale_price(data)
         
-        predicted_rent *= location_factor
-    
-    # Round to nearest $10
-    return round(predicted_rent / 10) * 10
+        # Rental price prediction
+        if rental_model is not None:
+            try:
+                rental_price = rental_model.predict(rental_features)[0]
+            except Exception as e:
+                logger.error(f"Error predicting rental price: {e}")
+                notes.append("Using fallback rental price prediction")
+                rental_price = calculate_fallback_rental_price(data)
+        else:
+            notes.append("Rental model not loaded, using fallback prediction")
+            rental_price = calculate_fallback_rental_price(data)
+        
+        return {
+            "status": "success",
+            "timestamp": datetime.now().isoformat(),
+            "predictedSalePrice": float(sale_price),
+            "predictedRent": float(rental_price),
+            "notes": notes
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in get_predictions: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
 
 # Change the line at the bottom of app.py
 if __name__ == '__main__':
