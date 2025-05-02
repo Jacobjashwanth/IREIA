@@ -9,12 +9,24 @@ const Navbar = () => {
           const { latitude, longitude } = position.coords;
           window.location.href = `/properties?lat=${latitude}&lng=${longitude}`;
         },
-        () => {
-          alert("Location access denied. Cannot fetch nearby properties.");
+        (error) => {
+          console.error(error);
+          const userLocation = prompt("📍 We couldn't detect your location. Please enter your City or ZIP code:");
+
+          if (userLocation && userLocation.trim() !== "") {
+            window.location.href = `/properties?location=${encodeURIComponent(userLocation.trim())}`;
+          } else {
+            alert("❌ Location is required to search properties.");
+          }
         }
       );
     } else {
-      alert("Geolocation is not supported by your browser.");
+      const userLocation = prompt("📍 Geolocation not supported. Please enter your City or ZIP code:");
+      if (userLocation && userLocation.trim() !== "") {
+        window.location.href = `/properties?location=${encodeURIComponent(userLocation.trim())}`;
+      } else {
+        alert("❌ Location is required to search properties.");
+      }
     }
   };
 
@@ -24,9 +36,7 @@ const Navbar = () => {
         <div><span className="logo-name">IREIA</span></div>
         <ul className="nav-links">
           <li><a href="/">Home</a></li>
-          <li>
-            <button className="nav-link" onClick={handlePropertiesClick}>Properties</button>
-          </li>
+          <li><button className="nav-link" onClick={handlePropertiesClick}>Properties</button></li>
           <li><a href="/loan">Loan</a></li>
           <li><a href="/about">About</a></li>
           <li><a href="/contact">Contact</a></li>

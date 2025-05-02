@@ -15,9 +15,16 @@ const SearchBar = () => {
     const queryParams = new URLSearchParams();
     if (address) queryParams.append('address', address.trim());
     if (location) queryParams.append('location', location.trim());
-    if (propertyType) queryParams.append('type', propertyType.trim());
+    if (propertyType) queryParams.append('property_type', propertyType.trim());
 
     window.location.href = `/search?${queryParams.toString()}`;
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSearch();
+    }
   };
 
   return (
@@ -28,12 +35,14 @@ const SearchBar = () => {
           placeholder="Enter address"
           value={address}
           onChange={(e) => setAddress(e.target.value)}
+          onKeyDown={handleKeyDown}   // ✅ No comment here
         />
         <input
           type="text"
           placeholder="Location (ZIP, City, or County)"
           value={location}
           onChange={(e) => setLocation(e.target.value)}
+          onKeyDown={handleKeyDown}   // ✅ No comment here
         />
         <select value={propertyType} onChange={(e) => setPropertyType(e.target.value)}>
           <option value="">Property type</option>
@@ -45,9 +54,6 @@ const SearchBar = () => {
       </div>
       <div className="search-actions">
         <button className="search-btn" onClick={handleSearch}>Search Properties</button>
-        {/* <button className="advanced-btn">
-          <span>&#9662;</span> Advanced Search
-        </button> */}
       </div>
     </div>
   );

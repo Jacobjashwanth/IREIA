@@ -18,8 +18,8 @@ print("✅ XGBoost Model Loaded")
 
 # ✅ Realtor API Config
 # REALTOR_API_KEY = "437454f397mshfe07ce79095c448p12a3c1jsn8c871f0050cd"
-# REALTOR_API_KEY = "879275a2b6mshf4b3de1300b03aep10b3edjsn456c19e64bda"
-REALTOR_API_KEY = "6b504def46msha6bf4ff53605f98p1c0c1djsn3fcd43362b33"
+REALTOR_API_KEY = "879275a2b6mshf4b3de1300b03aep10b3edjsn456c19e64bda"
+# REALTOR_API_KEY = "6b504def46msha6bf4ff53605f98p1c0c1djsn3fcd43362b33"
 REALTOR_HOST = "realty-in-us.p.rapidapi.com"
 HEADERS = {
     "X-RapidAPI-Key": REALTOR_API_KEY,
@@ -31,7 +31,7 @@ HEADERS = {
 def fetch_properties_from_api(location):
     url = "https://realty-in-us.p.rapidapi.com/properties/v3/list"
     payload = {
-        "limit": 15,
+        "limit": 20,
         "offset": 0,
         "status": ["for_sale"],
         "sort": {"direction": "desc", "field": "list_date"},
@@ -71,7 +71,13 @@ def predict_prices_for_properties(properties):
             beds = prop.get("description", {}).get("beds", "N/A")  # Add default "N/A" in case of missing data
             baths = prop.get("description", {}).get("baths", "N/A")  # Add default "N/A" in case of missing data
             sqft = prop.get("description", {}).get("sqft", 1500)
-            year_built = prop.get("description", {}).get("year_built", 2005)
+            year_built = (
+                prop.get("description", {}).get("year_built")
+                or prop.get("building_size", {}).get("year_built")
+                or prop.get("year_built")
+                or 2005
+            )
+            year_built = int(year_built) if str(year_built).isdigit() else 2005
             list_price = price
 
             # ✅ Final Feature Vector
