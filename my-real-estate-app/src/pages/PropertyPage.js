@@ -1,14 +1,13 @@
-// src/pages/PropertyPage.jsx
-import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import Chart from 'chart.js/auto';
-import Navbar from '../components/Navbar';
-import Footer from '../components/Footer';
-import { initMapWithProperties } from '../utils/maps';
-import { FaBed, FaBath, FaRulerCombined, FaRegCalendarAlt } from 'react-icons/fa';
+import React, { useEffect, useRef, useState } from 'react';
 import { CircularProgressbar, buildStyles } from 'react-circular-progressbar';
 import 'react-circular-progressbar/dist/styles.css';
+import { FaBath, FaBed, FaRegCalendarAlt, FaRulerCombined } from 'react-icons/fa';
+import { useNavigate } from 'react-router-dom';
+import Footer from '../components/Footer';
+import Navbar from '../components/Navbar';
 import '../styles/PropertyPage.css';
+import { initMapWithProperties } from '../utils/maps';
 
 const PropertyPage = () => {
   const navigate = useNavigate();
@@ -27,8 +26,8 @@ const PropertyPage = () => {
 
   useEffect(() => {
     if (!property) return;
+    console.log("📍 Property loaded:", property);
 
-    // Chart drawing
     const ctx = document.getElementById('priceChart')?.getContext('2d');
     if (ctx && chartRef.current) chartRef.current.destroy();
 
@@ -71,21 +70,39 @@ const PropertyPage = () => {
       });
     }
 
-    initMapWithProperties([property]); // For now, only selected property
+    initMapWithProperties([property]);
 
-    fetchNearbySchools(property.latitude, property.longitude);
+    const lat = parseFloat(property.latitude);
+    const lng = parseFloat(property.longitude);
+
+    if (!isNaN(lat) && !isNaN(lng)) {
+      fetchNearbySchools(lat, lng);
+    }
   }, [property]);
 
   const fetchNearbySchools = (lat, lng) => {
-    const service = new window.google.maps.places.PlacesService(document.createElement('div'));
+    if (!lat || !lng || !window.google?.maps?.places) {
+      console.warn("❌ Google Maps or coordinates not ready.");
+      return;
+    }
+  
+    const location = new window.google.maps.LatLng(parseFloat(lat), parseFloat(lng));
+    const map = new window.google.maps.Map(document.createElement('div')); // dummy map
+    const service = new window.google.maps.places.PlacesService(map);
+  
     const request = {
-      location: new window.google.maps.LatLng(lat, lng),
-      radius: 2000,
-      type: ['school']
+      location,
+      radius: 3000,
+      type: 'school'
     };
+  
     service.nearbySearch(request, (results, status) => {
+      console.log("📚 School Status:", status);
       if (status === window.google.maps.places.PlacesServiceStatus.OK) {
         setSchools(results.slice(0, 5));
+      } else {
+        console.warn("⚠️ No schools found or error:", status);
+        setSchools([]);
       }
     });
   };
@@ -162,11 +179,16 @@ const PropertyPage = () => {
         <div className="schools-section">
           <h3>🏫 Nearby Schools</h3>
           <ul>
-            {schools.map((school, idx) => (
-              <li key={idx}>
-                <b>{school.name}</b> — {school.vicinity || 'Location not available'}
-              </li>
-            ))}
+            {schools.length > 0 ? (
+              schools.map((school, idx) => (
+                <li key={idx}>
+                  <b>{school.name}</b>
+                  {school.vicinity ? ` — ${school.vicinity}` : ''}
+                </li>
+              ))
+            ) : (
+              <li>No nearby schools found.</li>
+            )}
           </ul>
         </div>
       </div>
