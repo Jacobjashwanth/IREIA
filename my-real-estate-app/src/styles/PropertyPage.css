@@ -142,3 +142,63 @@
     min-width: 300px;
     max-width: 100%;
   }
+
+.prediction-section {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  width: 100%;
+  gap: 20px;
+}
+
+.prediction-left {
+  flex: 0 0 25%;
+}
+
+.prediction-right {
+  flex: 0 0 70%;
+  text-align: right;
+  padding-right: 0;
+}
+
+.prediction-right p {
+  margin-bottom: 8px;
+  white-space: nowrap;
+  margin-right: 0;
+}
+
+.charts-container {
+  display: flex;
+  gap: 2rem;
+  margin: 2rem 0;
+  width: 100%;
+}
+
+.chart-section {
+  flex: 1;
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.chart-section h3 {
+  margin-bottom: 1rem;
+  color: #333;
+  font-size: 1.2rem;
+}
+
+.chart-section canvas {
+  width: 100% !important;
+  height: 300px !important;
+}
+
+@media (max-width: 768px) {
+  .charts-container {
+    flex-direction: column;
+  }
+  
+  .chart-section {
+    margin-bottom: 1rem;
+  }
+}

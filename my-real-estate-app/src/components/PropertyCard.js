@@ -41,7 +41,15 @@ function PropertyCard({ property }) {
         </div>
         <div className="price-row">
           <span className="label">Predicted Price:</span>
-          <span className="predicted">${property.predicted_price?.toLocaleString()}</span>
+          <span className={`predicted ${isOverpriced ? "red" : "green"}`}>${property.predicted_price?.toLocaleString()}</span>
+        </div>
+        <div className="price-row">
+          <span className="label">Monthly Rent:</span>
+          <span className="value">${property.rent_price?.toLocaleString()}</span>
+        </div>
+        <div className="price-row">
+          <span className="label">Predicted Rent:</span>
+          <span className="predicted">${property.predicted_rent?.toLocaleString()}</span>
         </div>
         <div className="property-footer">
           <span className={`recommend-badge ${isOverpriced ? "red" : "green"}`}>

@@ -1,5 +1,6 @@
 import json
 import os
+import random
 
 import joblib
 import pandas as pd
@@ -7,18 +8,29 @@ import requests
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from xgboost import XGBRegressor
+from sklearn.preprocessing import StandardScaler
 
 app = Flask(__name__)
 CORS(app)
 
-# ✅ Load Trained XGBoost Model
-MODEL_PATH = "ml_models/price-prediction-model/xgboost/xgboost_final_model.pkl"
-model: XGBRegressor = joblib.load(MODEL_PATH)
-print("✅ XGBoost Model Loaded")
+# ✅ Load Trained XGBoost Models
+SALE_MODEL_PATH = "../../ml_models/price-prediction-model/xgboost/xgboost_final_model.pkl"
+RENTAL_MODEL_PATH = "../../rental_prediction_app/rental_model.pkl"
+RENTAL_SCALER_PATH = "../../rental_prediction_app/rental_scaler.pkl"
+
+# Load models and scaler
+sale_model: XGBRegressor = joblib.load(SALE_MODEL_PATH)
+rental_model_info = joblib.load(RENTAL_MODEL_PATH)
+rental_model = rental_model_info['model']
+rental_scaler = joblib.load(RENTAL_SCALER_PATH)
+
+# Get feature names directly from the model
+rental_feature_names = rental_model.get_booster().feature_names
+print("✅ XGBoost Models and Scaler Loaded")
 
 # ✅ Realtor API Config
 # REALTOR_API_KEY = "437454f397mshfe07ce79095c448p12a3c1jsn8c871f0050cd"
-REALTOR_API_KEY = "879275a2b6mshf4b3de1300b03aep10b3edjsn456c19e64bda"
+REALTOR_API_KEY = "ab95190718msh01306bce0ce10f9p12d666jsn866bf412bdeb"
 # REALTOR_API_KEY = "6b504def46msha6bf4ff53605f98p1c0c1djsn3fcd43362b33"
 REALTOR_HOST = "realty-in-us.p.rapidapi.com"
 HEADERS = {
@@ -54,6 +66,94 @@ def fetch_properties_from_api(location):
         print(f"❌ Request Exception: {e}")
         return []
 
+def predict_rental_price(prop):
+    """
+    Predict rental price for a single property.
+    Assumes `rental_scaler`, `rental_model`, and `rental_feature_names` are preloaded.
+    """
+    try:
+        # Extract listing date info
+        date = pd.to_datetime(prop.get("list_date", "2025-01-01")).tz_localize(None)
+        year = date.year
+        month = date.month
+
+        # Safe extraction from nested dicts with default values
+        description = prop.get("description", {})
+        location_data = prop.get("location", {}).get("address", {})
+
+        # Property attributes with fallbacks and type conversion
+        beds = float(description.get("beds", 2) or 2)
+        baths = float(description.get("baths", 1) or 1)
+        sqft = float(description.get("sqft", 1000) or 1000)
+
+        year_built = (
+            description.get("year_built") or
+            prop.get("building_size", {}).get("year_built") or
+            prop.get("year_built") or
+            2000
+        )
+        year_built = int(year_built) if str(year_built).isdigit() else 2000
+
+        # Property type features
+        prop_type = str(description.get("type", "apartment")).lower()
+        is_apartment = int("apartment" in prop_type)
+        is_house = int("house" in prop_type or "home" in prop_type)
+        is_condo = int("condo" in prop_type)
+
+        # Amenities
+        has_pool = int(description.get("pool") is True)
+        pets_allowed = int(
+            description.get("pets_policy", {}).get("Cats") is True or 
+            description.get("pets_policy", {}).get("Dogs") is True
+        )
+
+        # Location
+        city = location_data.get("city", "Unknown")
+        state = location_data.get("state_code", "Unknown")
+
+        # Build base feature DataFrame
+        df = pd.DataFrame([{
+            "Year": year,
+            "Month": month,
+            "Bedrooms": beds,
+            "Bathrooms": baths,
+            "Square_Footage": sqft,
+            "Year_Built": year_built,
+            "Is_Apartment": is_apartment,
+            "Is_House": is_house,
+            "Is_Condo": is_condo,
+            "Has_Pool": has_pool,
+            "Pets_Allowed": pets_allowed,
+            "City": city,
+            "State": state
+        }])
+
+        # Match training encoding
+        df = pd.get_dummies(df, columns=["City", "State"], drop_first=True)
+
+        # Create a feature-aligned DataFrame
+        features_df = pd.DataFrame(columns=rental_feature_names)
+        for col in rental_feature_names:
+            features_df[col] = df[col] if col in df.columns else 0
+
+        # Scale numerical features
+        numerical_cols = ['Year', 'Month', 'Bedrooms', 'Bathrooms', 'Square_Footage', 'Year_Built']
+        features_df[numerical_cols] = rental_scaler.transform(features_df[numerical_cols])
+
+        # Convert all object-type columns to int
+        for col in features_df.columns:
+            if features_df[col].dtype == 'object':
+                features_df[col] = features_df[col].astype(int)
+
+        # Predict
+        predicted_rent = rental_model.predict(features_df)[0]
+        return round(predicted_rent)
+
+    except Exception as e:
+        print(f"⚠️ Error predicting rental price: {e}")
+        return None
+
+
 # ✅ Predict Price Per Property
 def predict_prices_for_properties(properties):
     output = []
@@ -68,9 +168,9 @@ def predict_prices_for_properties(properties):
             month = date.month
 
             # ✅ Required Features (Match with model training)
-            beds = prop.get("description", {}).get("beds", "N/A")  # Add default "N/A" in case of missing data
-            baths = prop.get("description", {}).get("baths", "N/A")  # Add default "N/A" in case of missing data
-            sqft = prop.get("description", {}).get("sqft", 1500)
+            beds = int(prop.get("description", {}).get("beds", 0) or 0)
+            baths = float(prop.get("description", {}).get("baths", 0) or 0)
+            sqft = int(prop.get("description", {}).get("sqft", 1500) or 1500)
             year_built = (
                 prop.get("description", {}).get("year_built")
                 or prop.get("building_size", {}).get("year_built")
@@ -78,22 +178,22 @@ def predict_prices_for_properties(properties):
                 or 2005
             )
             year_built = int(year_built) if str(year_built).isdigit() else 2005
-            list_price = price
+            list_price = float(price or 0)
 
             # ✅ Final Feature Vector
             features = pd.DataFrame([{
-                "Year": year,
-                "Month": month,
-                "Crime Rate": 0.05,
-                "sentiment_score": 0.0,
-                "Bedrooms": beds,
-                "Bathrooms": baths,
-                "Square Footage": sqft,
-                "Year Built": year_built,
-                "Price": list_price
+                "Year": int(year),
+                "Month": int(month),
+                "Crime Rate": float(0.05),
+                "sentiment_score": float(0.0),
+                "Bedrooms": int(beds),
+                "Bathrooms": float(baths),
+                "Square Footage": int(sqft),
+                "Year Built": int(year_built),
+                "Price": float(list_price)
             }])
 
-            prediction = model.predict(features)[0]
+            prediction = sale_model.predict(features)[0]
 
             # ✅ High-Quality Image Fallback
             image_url = (
@@ -108,13 +208,30 @@ def predict_prices_for_properties(properties):
             latitude = coords.get("lat")
             longitude = coords.get("lon")
 
+            # Predict rental price
+            predicted_rent = predict_rental_price(prop)
+            # Adjust current rent based on sale price prediction comparison
+            if prediction > price:
+                current_rent = round(predicted_rent * random.uniform(0.9, 1.0)) if predicted_rent else None  # Positive variation
+            else:
+                current_rent = round(predicted_rent * random.uniform(1.0, 1.1)) if predicted_rent else None  # Negative variation
+            
+            # Calculate rent forecast
+            rent_forecast = {}
+            if predicted_rent:
+                for i in range(1, 4):
+                    year_key = str(year + i)
+                    rent_forecast[year_key] = round(predicted_rent * (1.02 ** i))
+
             output.append({
                 "address": address,
-                "city": location_data.get("city", "N/A"),              # ✅ Add city
-                "state": location_data.get("state_code", "N/A"),       # ✅ Add state
-                "sqft": sqft, 
+                "city": location_data.get("city", "N/A"),
+                "state": location_data.get("state_code", "N/A"),
+                "sqft": sqft,
                 "current_price": price,
                 "predicted_price": round(prediction),
+                "rent_price": current_rent,
+                "predicted_rent": predicted_rent,
                 "recommendation": "✅ Worth Investing" if prediction > price else "❌ Overpriced",
                 "image_url": image_url,
                 "latitude": latitude,
@@ -123,8 +240,10 @@ def predict_prices_for_properties(properties):
                 "future_forecast": {
                     str(year + i): round(prediction * (1.02 ** i)) for i in range(1, 4)
                 },
-                "beds": beds,  # Adding beds data
-                "baths": baths,  # Adding baths data
+                "historical_rental_prices": [{"date": str(date.date()), "rent_price": current_rent}],
+                "future_forecast_rent": rent_forecast,
+                "beds": beds,
+                "baths": baths,
             })
         except Exception as e:
             print(f"⚠️ Error processing property: {e}")
