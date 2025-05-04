@@ -77,7 +77,14 @@
 
 .predicted {
   font-weight: 600;
+}
+
+.predicted.green {
   color: #3f9c35;
+}
+
+.predicted.red {
+  color: #cc0000;
 }
 
 .property-footer {

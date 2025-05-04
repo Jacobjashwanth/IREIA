@@ -31,15 +31,18 @@ export function initMapWithProperties(properties) {
 
     const boxIcon = {
       url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-        <svg xmlns="http://www.w3.org/2000/svg" width="100" height="36">
-          <rect width="100" height="36" rx="8" ry="8" fill="${color}" />
-          <text x="50" y="24" font-size="14" font-family="Arial" fill="white" font-weight="bold" text-anchor="middle">
+        <svg xmlns="http://www.w3.org/2000/svg" width="100" height="48">
+          <rect width="100" height="48" rx="8" ry="8" fill="${color}" />
+          <text x="50" y="20" font-size="12" font-family="Arial" fill="white" font-weight="bold" text-anchor="middle">
             $${Number(prop.current_price).toLocaleString()}
+          </text>
+          <text x="50" y="36" font-size="12" font-family="Arial" fill="white" font-weight="bold" text-anchor="middle">
+            $${Number(prop.rent_price).toLocaleString()}
           </text>
         </svg>
       `)}`,
-      scaledSize: new window.google.maps.Size(100, 36),
-      anchor: new window.google.maps.Point(50, 18),
+      scaledSize: new window.google.maps.Size(100, 48),
+      anchor: new window.google.maps.Point(50, 24),
     };
 
     const marker = new window.google.maps.Marker({
@@ -56,6 +59,7 @@ export function initMapWithProperties(properties) {
       <div class="map-popup-address">${prop.address}</div>
       💰 <b>List:</b> $${Number(prop.current_price).toLocaleString()}<br>
       📈 <b>Predicted:</b> $${Number(prop.predicted_price).toLocaleString()}<br>
+      📊 <b>Predicted Rent:</b> $${Number(prop.predicted_rent).toLocaleString()}<br>
       <span class="map-popup-recommend" style="color: ${isOverpriced ? '#ff4d4f' : '#4CAF50'};">
         ${prop.recommendation}
       </span>

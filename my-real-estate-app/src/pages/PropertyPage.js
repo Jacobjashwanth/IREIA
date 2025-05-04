@@ -28,10 +28,10 @@ const PropertyPage = () => {
     if (!property) return;
     console.log("📍 Property loaded:", property);
 
-    const ctx = document.getElementById('priceChart')?.getContext('2d');
-    if (ctx && chartRef.current) chartRef.current.destroy();
+    const priceCtx = document.getElementById('priceChart')?.getContext('2d');
+    if (priceCtx && chartRef.current) chartRef.current.destroy();
 
-    if (ctx) {
+    if (priceCtx) {
       const labels = [
         ...property.historical_prices.map(p => p.date),
         ...Object.keys(property.future_forecast)
@@ -41,7 +41,7 @@ const PropertyPage = () => {
         ...Object.values(property.future_forecast)
       ];
 
-      chartRef.current = new Chart(ctx, {
+      chartRef.current = new Chart(priceCtx, {
         type: 'line',
         data: {
           labels,
@@ -68,6 +68,94 @@ const PropertyPage = () => {
           }
         }
       });
+    }
+
+    const rentCtx = document.getElementById('rentChart')?.getContext('2d');
+    if (rentCtx) {
+      const rentForecast = property.future_forecast_rent || {};
+      const historicalRent = property.historical_rental_prices || [];
+      
+      if (Object.keys(rentForecast).length === 0) {
+        // Show a message when no forecast data is available
+        new Chart(rentCtx, {
+          type: 'bar',
+          data: {
+            labels: ['No Data Available'],
+            datasets: [{
+              label: 'Monthly Rent ($)',
+              data: [0],
+              backgroundColor: 'rgba(200, 200, 200, 0.6)',
+              borderColor: '#C8C8C8',
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: function() {
+                    return 'Rent forecast not available';
+                  }
+                }
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                display: false
+              }
+            }
+          }
+        });
+      } else {
+        // Combine historical and future data
+        const labels = [
+          ...historicalRent.map(p => p.date),
+          ...Object.keys(rentForecast)
+        ];
+        const data = [
+          ...historicalRent.map(p => p.rent_price),
+          ...Object.values(rentForecast)
+        ];
+
+        // Show the forecast data when available
+        new Chart(rentCtx, {
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [{
+              label: 'Monthly Rent ($)',
+              data,
+              backgroundColor: 'rgba(33, 150, 243, 0.6)',
+              borderColor: '#2196F3',
+              borderWidth: 2,
+              borderRadius: 5
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    return `$${context.raw.toLocaleString()}/month`;
+                  }
+                }
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: false,
+                ticks: {
+                  callback: value => `$${value.toLocaleString()}`
+                }
+              }
+            }
+          }
+        });
+      }
     }
 
     initMapWithProperties([property]);
@@ -125,18 +213,29 @@ const PropertyPage = () => {
           </div>
 
           <div className="info-grid">
-            <p><b>List Price:</b> ${property.current_price.toLocaleString()}</p>
             <p><FaBed /> <b>Beds:</b> {property.beds || 'N/A'} | <FaBath /> <b>Baths:</b> {property.baths || 'N/A'}</p>
             <p><FaRulerCombined /> <b>Sq Ft:</b> {property.sqft || 'N/A'} | <FaRegCalendarAlt /> <b>Year Built:</b> {property.year_built || 'N/A'}</p>
+            <p><b>List Price:</b> ${property.current_price.toLocaleString()}</p>
+            <p><b>Monthly Rent:</b> ${property.rent_price?.toLocaleString() || 'N/A'}</p>
             <p className={property.recommendation.includes("Over") ? "predicted red" : "predicted green"}>
               <b>Predicted Price:</b> ${property.predicted_price.toLocaleString()} | {property.recommendation}
+            </p>
+            <p className={property.recommendation.includes("Over") ? "predicted red" : "predicted green"}>
+              <b>Predicted Monthly Rent:</b> ${property.predicted_rent?.toLocaleString()}
             </p>
           </div>
         </div>
 
-        <div className="chart-section">
-          <h3>📈 Future Price Prediction</h3>
-          <canvas id="priceChart"></canvas>
+        <div className="charts-container">
+          <div className="chart-section">
+            <h3>📈 Future Price Prediction</h3>
+            <canvas id="priceChart"></canvas>
+          </div>
+
+          <div className="chart-section">
+            <h3>💰 Monthly Rental Price Forecast</h3>
+            <canvas id="rentChart"></canvas>
+          </div>
         </div>
 
         <div className="side-by-side">
