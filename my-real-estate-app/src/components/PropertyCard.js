@@ -1,7 +1,7 @@
 import React from "react";
 import { FaBath, FaBed, FaMapMarkerAlt, FaRulerCombined } from "react-icons/fa";
-import "../styles/PropertyCard.css";
 import { useNavigate } from "react-router-dom";
+import "../styles/PropertyCard.css";
 
 function PropertyCard({ property }) {
   const navigate = useNavigate();
@@ -49,7 +49,7 @@ function PropertyCard({ property }) {
         </div>
         <div className="price-row">
           <span className="label">Predicted Rent:</span>
-          <span className="predicted">${property.predicted_rent?.toLocaleString()}</span>
+          <span className={`predicted ${isOverpriced ? "red" : "green"}`}>${property.predicted_rent?.toLocaleString()}</span>
         </div>
         <div className="property-footer">
           <span className={`recommend-badge ${isOverpriced ? "red" : "green"}`}>

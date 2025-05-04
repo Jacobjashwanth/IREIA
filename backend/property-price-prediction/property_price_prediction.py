@@ -14,9 +14,9 @@ app = Flask(__name__)
 CORS(app)
 
 # ✅ Load Trained XGBoost Models
-SALE_MODEL_PATH = "../../ml_models/price-prediction-model/xgboost/xgboost_final_model.pkl"
-RENTAL_MODEL_PATH = "../../rental_prediction_app/rental_model.pkl"
-RENTAL_SCALER_PATH = "../../rental_prediction_app/rental_scaler.pkl"
+SALE_MODEL_PATH = "ml_models/price-prediction-model/xgboost/xgboost_final_model.pkl"
+RENTAL_MODEL_PATH = "rental_prediction_app/rental_model.pkl"
+RENTAL_SCALER_PATH = "rental_prediction_app/rental_scaler.pkl"
 
 # Load models and scaler
 sale_model: XGBRegressor = joblib.load(SALE_MODEL_PATH)
