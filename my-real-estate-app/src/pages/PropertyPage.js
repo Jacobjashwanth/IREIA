@@ -270,7 +270,7 @@ const PropertyPage = () => {
           </div>
 
           <div className="map-section">
-            <h3>🗺️ Nearby Properties</h3>
+            <h3>🗺️ Property On Map</h3>
             <div id="map" style={{ height: '300px', borderRadius: '10px' }}></div>
           </div>
         </div>
