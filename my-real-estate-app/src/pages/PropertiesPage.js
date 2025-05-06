@@ -1,5 +1,5 @@
 // src/pages/PropertiesPage.jsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Footer from '../components/Footer';
 import Navbar from '../components/Navbar';
 import PropertyCard from '../components/PropertyCard';
@@ -15,31 +15,16 @@ const PropertiesPage = () => {
   const [manualLocationInput, setManualLocationInput] = useState('');
   const propertiesPerPage = 6;
 
-  useEffect(() => {
-    const query = new URLSearchParams(window.location.search);
-    const lat = query.get("lat");
-    const lng = query.get("lng");
-    const locationParam = query.get("location");
-
-    if (locationParam) {
-      fetchPropertiesFromLocation(locationParam);
-    } else if (lat && lng) {
-      reverseGeocode(lat, lng);
-    } else {
-      setNeedsManualLocation(true);
-    }
-  }, []);
-
-  const reverseGeocode = async (lat, lng) => {
+  const reverseGeocode = useCallback(async (lat, lng) => {
     try {
       const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=AIzaSyAC2_CrKzi9aSnFXsQdwixcuEVzPmdNbnk`);
       const data = await res.json();
-
+  
       if (data.status === 'OK' && data.results.length > 0) {
         const addressComponents = data.results[0].address_components;
         const city = addressComponents.find(c => c.types.includes('locality'));
         const zip = addressComponents.find(c => c.types.includes('postal_code'));
-
+  
         const location = city?.long_name || zip?.long_name;
         if (location) {
           fetchPropertiesFromLocation(location);
@@ -51,7 +36,22 @@ const PropertiesPage = () => {
       console.error('Reverse geocoding failed:', err);
       setNeedsManualLocation(true);
     }
-  };
+  }, []);
+  
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+    const lat = query.get("lat");
+    const lng = query.get("lng");
+    const locationParam = query.get("location");
+  
+    if (locationParam) {
+      fetchPropertiesFromLocation(locationParam);
+    } else if (lat && lng) {
+      reverseGeocode(lat, lng);
+    } else {
+      setNeedsManualLocation(true);
+    }
+  }, [reverseGeocode]);
 
   const fetchPropertiesFromLocation = async (location) => {
     try {
