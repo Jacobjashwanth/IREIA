@@ -208,7 +208,31 @@ const PropertyPage = () => {
           <h2>{property.address}</h2>
           <div className="carousel">
             {[property.image_url, ...(property.gallery || [])].map((img, idx) => (
-              <img key={idx} src={img} alt={`Property view ${idx + 1}`} className="carousel-img" />
+              <img
+              key={idx}
+              src={(() => {
+                const photoUrl = img;
+                if (!photoUrl) return '/genbcs-24082644-0-jpg.png';
+            
+                return photoUrl
+                  ?.replace(/-m(\d+)s\.jpg/, '-m$1x.jpg')
+                  ?.replace(/-t\.jpg/, '-o.jpg')
+                  ?.replace(/s\.jpg$/, 'od.jpg')
+                  ?.replace(/-m(\d+)\.jpg/, '-m$1x.jpg')
+                  ?.replace(/-l\.jpg/, '-o.jpg')
+                  ?.replace(/-p\.jpg/, '-o.jpg');
+              })()}
+              alt={`Property view ${idx + 1}`}
+              className="carousel-img"
+              onError={(e) => { e.target.src = '/genbcs-24082644-0-jpg.png'; }}
+              style={{
+                width: '100%',
+                height: 'auto',
+                objectFit: 'cover',
+                borderRadius: '10px',
+                marginBottom: '15px'
+              }}
+            />
             ))}
           </div>
 
