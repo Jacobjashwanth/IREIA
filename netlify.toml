@@ -1,4 +1,4 @@
 [build]
   base = "my-real-estate-app"
   command = "npm run build"
-  publish = "my-real-estate-app/build"
+  publish = "build"
