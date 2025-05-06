@@ -1,5 +1,4 @@
-// src/pages/PropertiesPage.jsx
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Footer from '../components/Footer';
 import Navbar from '../components/Navbar';
 import PropertyCard from '../components/PropertyCard';
@@ -13,6 +12,7 @@ const PropertiesPage = () => {
   const [error, setError] = useState('');
   const [needsManualLocation, setNeedsManualLocation] = useState(false);
   const [manualLocationInput, setManualLocationInput] = useState('');
+  const [loading, setLoading] = useState(true); // 🔄 Spinner state
   const propertiesPerPage = 6;
 
   const reverseGeocode = useCallback(async (lat, lng) => {
@@ -32,9 +32,11 @@ const PropertiesPage = () => {
         }
       }
       setNeedsManualLocation(true);
+      setLoading(false);
     } catch (err) {
       console.error('Reverse geocoding failed:', err);
       setNeedsManualLocation(true);
+      setLoading(false);
     }
   }, []);
   
@@ -50,11 +52,13 @@ const PropertiesPage = () => {
       reverseGeocode(lat, lng);
     } else {
       setNeedsManualLocation(true);
+      setLoading(false);
     }
   }, [reverseGeocode]);
 
   const fetchPropertiesFromLocation = async (location) => {
     try {
+      setLoading(true);
       setLocationName(location);
 
       const response = await fetch('https://ireia.onrender.com/search_property', {
@@ -80,6 +84,8 @@ const PropertiesPage = () => {
     } catch (err) {
       console.error('Property fetch error:', err);
       setError('Unable to fetch properties.');
+    } finally {
+      setLoading(false); // 🔄 stop spinner
     }
   };
 
@@ -106,7 +112,12 @@ const PropertiesPage = () => {
             Properties near <span style={{ textTransform: 'capitalize' }}>{locationName}</span>
           </h2>
 
-          {needsManualLocation ? (
+          {loading ? (
+            <div className="loader-container">
+              <div className="spinner"></div>
+              <p>Fetching properties...</p>
+            </div>
+          ) : needsManualLocation ? (
             <div className="manual-location-box">
               <h3>📍 Enter Your Location</h3>
               <input
@@ -140,7 +151,6 @@ const PropertiesPage = () => {
             </>
           )}
         </div>
-
         <div id="map" className="map-section" />
       </div>
       <Footer />
