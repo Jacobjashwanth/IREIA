@@ -57,7 +57,7 @@ const PropertiesPage = () => {
     try {
       setLocationName(location);
 
-      const response = await fetch('http://127.0.0.1:5000/search_property', {
+      const response = await fetch('https://ireia.onrender.com/search_property', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ location })
