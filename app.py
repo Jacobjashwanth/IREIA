@@ -30,7 +30,7 @@ print("✅ XGBoost Models and Scaler Loaded")
 
 # ✅ Realtor API Config
 # REALTOR_API_KEY = "437454f397mshfe07ce79095c448p12a3c1jsn8c871f0050cd"
-REALTOR_API_KEY = "ab95190718msh01306bce0ce10f9p12d666jsn866bf412bdeb"
+REALTOR_API_KEY = "24b5afb351mshff5413d600593d3p1796f7jsncfdbd232d642"
 # REALTOR_API_KEY = "6b504def46msha6bf4ff53605f98p1c0c1djsn3fcd43362b33"
 REALTOR_HOST = "realty-in-us.p.rapidapi.com"
 HEADERS = {
