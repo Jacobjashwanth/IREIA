@@ -171,7 +171,7 @@ const PropertyPage = () => {
     }
 
     const location = new window.google.maps.LatLng(parseFloat(lat), parseFloat(lng));
-    const map = new window.google.maps.Map(document.createElement('div')); // dummy map
+    const map = new window.google.maps.Map(document.createElement('div'));
     const service = new window.google.maps.places.PlacesService(map);
 
     const request = {
@@ -194,13 +194,16 @@ const PropertyPage = () => {
   const walkScore = Math.floor(Math.random() * 21) + 70;
   const transitScore = Math.floor(Math.random() * 21) + 60;
 
-  // ⭐ Investment Score based on logic (e.g., rent-to-price ratio or prediction gap)
-  const investmentScore = Math.min(
-    100,
-    Math.floor((property.predicted_rent / (property.current_price / 12)) * 10)
-  );
+  // ⭐ Investment Score with fallback and yield logic
+  let investmentScore = 0;
+  let investmentColor = '#e74c3c';
 
-  const investmentColor = investmentScore >= 60 ? "#2ecc71" : "#e74c3c"; // Green if good, red if bad
+  if (property.predicted_rent && property.current_price) {
+    const annualRent = property.predicted_rent * 12;
+    const rentYield = (annualRent / property.current_price) * 100;
+    investmentScore = Math.min(100, Math.round(rentYield));
+    investmentColor = investmentScore >= 6 ? '#2ecc71' : '#e74c3c';
+  }
 
   return (
     <>
@@ -248,11 +251,7 @@ const PropertyPage = () => {
                 <CircularProgressbar
                   value={walkScore}
                   text={`${walkScore}%`}
-                  styles={buildStyles({
-                    pathColor: "#4CAF50",
-                    textColor: "#333",
-                    trailColor: "#eee"
-                  })}
+                  styles={buildStyles({ pathColor: "#4CAF50", textColor: "#333", trailColor: "#eee" })}
                 />
                 <p>Walk Score</p>
               </div>
@@ -260,11 +259,7 @@ const PropertyPage = () => {
                 <CircularProgressbar
                   value={transitScore}
                   text={`${transitScore}%`}
-                  styles={buildStyles({
-                    pathColor: "#2196F3",
-                    textColor: "#333",
-                    trailColor: "#eee"
-                  })}
+                  styles={buildStyles({ pathColor: "#2196F3", textColor: "#333", trailColor: "#eee" })}
                 />
                 <p>Transit Score</p>
               </div>
@@ -272,11 +267,7 @@ const PropertyPage = () => {
                 <CircularProgressbar
                   value={investmentScore}
                   text={`${investmentScore}%`}
-                  styles={buildStyles({
-                    pathColor: investmentColor,
-                    textColor: "#333",
-                    trailColor: "#eee"
-                  })}
+                  styles={buildStyles({ pathColor: investmentColor, textColor: "#333", trailColor: "#eee" })}
                 />
                 <p>Investment Score</p>
               </div>
@@ -295,8 +286,7 @@ const PropertyPage = () => {
             {schools.length > 0 ? (
               schools.map((school, idx) => (
                 <li key={idx}>
-                  <b>{school.name}</b>
-                  {school.vicinity ? ` — ${school.vicinity}` : ''}
+                  <b>{school.name}</b>{school.vicinity ? ` — ${school.vicinity}` : ''}
                 </li>
               ))
             ) : (
