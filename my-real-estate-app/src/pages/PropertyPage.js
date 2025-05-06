@@ -26,6 +26,7 @@ const PropertyPage = () => {
 
   useEffect(() => {
     if (!property) return;
+    console.log("📍 Property loaded:", property);
 
     const priceCtx = document.getElementById('priceChart')?.getContext('2d');
     if (priceCtx && chartRef.current) chartRef.current.destroy();
@@ -73,8 +74,9 @@ const PropertyPage = () => {
     if (rentCtx) {
       const rentForecast = property.future_forecast_rent || {};
       const historicalRent = property.historical_rental_prices || [];
-
+      
       if (Object.keys(rentForecast).length === 0) {
+        // Show a message when no forecast data is available
         new Chart(rentCtx, {
           type: 'bar',
           data: {
@@ -92,7 +94,7 @@ const PropertyPage = () => {
               legend: { display: false },
               tooltip: {
                 callbacks: {
-                  label: function () {
+                  label: function() {
                     return 'Rent forecast not available';
                   }
                 }
@@ -107,6 +109,7 @@ const PropertyPage = () => {
           }
         });
       } else {
+        // Combine historical and future data
         const labels = [
           ...historicalRent.map(p => p.date),
           ...Object.keys(rentForecast)
@@ -116,6 +119,7 @@ const PropertyPage = () => {
           ...Object.values(rentForecast)
         ];
 
+        // Show the forecast data when available
         new Chart(rentCtx, {
           type: 'bar',
           data: {
@@ -135,7 +139,7 @@ const PropertyPage = () => {
               legend: { display: false },
               tooltip: {
                 callbacks: {
-                  label: function (context) {
+                  label: function(context) {
                     return `$${context.raw.toLocaleString()}/month`;
                   }
                 }
@@ -169,21 +173,23 @@ const PropertyPage = () => {
       console.warn("❌ Google Maps or coordinates not ready.");
       return;
     }
-
+  
     const location = new window.google.maps.LatLng(parseFloat(lat), parseFloat(lng));
-    const map = new window.google.maps.Map(document.createElement('div'));
+    const map = new window.google.maps.Map(document.createElement('div')); // dummy map
     const service = new window.google.maps.places.PlacesService(map);
-
+  
     const request = {
       location,
       radius: 3000,
       type: 'school'
     };
-
+  
     service.nearbySearch(request, (results, status) => {
+      console.log("📚 School Status:", status);
       if (status === window.google.maps.places.PlacesServiceStatus.OK) {
         setSchools(results.slice(0, 5));
       } else {
+        console.warn("⚠️ No schools found or error:", status);
         setSchools([]);
       }
     });
@@ -193,17 +199,6 @@ const PropertyPage = () => {
 
   const walkScore = Math.floor(Math.random() * 21) + 70;
   const transitScore = Math.floor(Math.random() * 21) + 60;
-
-  // ⭐ Investment Score with fallback and yield logic
-  let investmentScore = 0;
-  let investmentColor = '#e74c3c';
-
-  if (property.predicted_rent && property.current_price) {
-    const annualRent = property.predicted_rent * 12;
-    const rentYield = (annualRent / property.current_price) * 100;
-    investmentScore = Math.min(100, Math.round(rentYield));
-    investmentColor = investmentScore >= 6 ? '#2ecc71' : '#e74c3c';
-  }
 
   return (
     <>
@@ -245,13 +240,17 @@ const PropertyPage = () => {
 
         <div className="side-by-side">
           <div className="scores-section">
-            <h3>📊 Investment, Walk & Transit Scores</h3>
+            <h3>🚶 Walk & Transit Scores</h3>
             <div className="score-circles">
               <div className="score-circle">
                 <CircularProgressbar
                   value={walkScore}
                   text={`${walkScore}%`}
-                  styles={buildStyles({ pathColor: "#4CAF50", textColor: "#333", trailColor: "#eee" })}
+                  styles={buildStyles({
+                    pathColor: "#4CAF50",
+                    textColor: "#333",
+                    trailColor: "#eee"
+                  })}
                 />
                 <p>Walk Score</p>
               </div>
@@ -259,17 +258,13 @@ const PropertyPage = () => {
                 <CircularProgressbar
                   value={transitScore}
                   text={`${transitScore}%`}
-                  styles={buildStyles({ pathColor: "#2196F3", textColor: "#333", trailColor: "#eee" })}
+                  styles={buildStyles({
+                    pathColor: "#2196F3",
+                    textColor: "#333",
+                    trailColor: "#eee"
+                  })}
                 />
                 <p>Transit Score</p>
-              </div>
-              <div className="score-circle">
-                <CircularProgressbar
-                  value={investmentScore}
-                  text={`${investmentScore}%`}
-                  styles={buildStyles({ pathColor: investmentColor, textColor: "#333", trailColor: "#eee" })}
-                />
-                <p>Investment Score</p>
               </div>
             </div>
           </div>
@@ -286,7 +281,8 @@ const PropertyPage = () => {
             {schools.length > 0 ? (
               schools.map((school, idx) => (
                 <li key={idx}>
-                  <b>{school.name}</b>{school.vicinity ? ` — ${school.vicinity}` : ''}
+                  <b>{school.name}</b>
+                  {school.vicinity ? ` — ${school.vicinity}` : ''}
                 </li>
               ))
             ) : (
